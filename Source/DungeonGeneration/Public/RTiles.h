@@ -17,10 +17,10 @@ class DUNGEONGENERATION_API ARTiles : public AActor
 public:	
 	// Sets default values for this actor's properties
 	ARTiles();
-	void ChangeTile(UStaticMesh* StaticMesh);
+	void ChangeTile(UStaticMesh* StaticMesh,int32 InstancedIndex);
 
 	void AddTileInstance(const FVector Location);
-	
+	TArray<int32> InstanceIndices;
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -28,6 +28,9 @@ protected:
 	UPROPERTY(VisibleAnywhere,BlueprintReadWrite,Category="Component")
 	UInstancedStaticMeshComponent* InstancedStaticMeshComponent;
 
+	
+
+	
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

@@ -24,12 +24,27 @@ void ARTiles::BeginPlay()
 	Super::BeginPlay();
 }
 
-void ARTiles::ChangeTile(UStaticMesh* StaticMesh)
+void ARTiles::ChangeTile(UStaticMesh* StaticMesh,int32 InstancedIndex)
 {
 	// StaticMeshComponent->SetStaticMesh(StaticMesh);
-	if(InstancedStaticMeshComponent)
+	if(InstancedStaticMeshComponent && StaticMesh)
 	{
-		InstancedStaticMeshComponent->SetStaticMesh(StaticMesh);
+		// InstancedStaticMeshComponent->SetStaticMesh(StaticMesh);
+		UInstancedStaticMeshComponent* NewInstanceComponent = NewObject<UInstancedStaticMeshComponent>(this);
+		NewInstanceComponent->RegisterComponentWithWorld(GetWorld());
+		NewInstanceComponent->SetStaticMesh(StaticMesh);
+		NewInstanceComponent->SetMobility(EComponentMobility::Movable);
+
+
+		FTransform InstanceTransform;
+		InstancedStaticMeshComponent->GetInstanceTransform(InstancedIndex,InstanceTransform);
+
+		int32 NewInstanceIndex = NewInstanceComponent->AddInstance(InstanceTransform);
+
+		// InstancedStaticMeshComponent->UpdateInstanceTransform(InstancedIndex,FTransform());
+		// InstancedStaticMeshComponent->RemoveInstance(InstancedIndex);
+
+		NewInstanceComponent->AttachToComponent(RootComponent,FAttachmentTransformRules::KeepRelativeTransform);
 	}
 }
 
@@ -37,7 +52,13 @@ void ARTiles::AddTileInstance(const FVector Location)
 {
 	if(InstancedStaticMeshComponent)
 	{
-		InstancedStaticMeshComponent->AddInstance(FTransform(Location));
+		for (int32 MaterialIndex = 0; MaterialIndex < InstancedStaticMeshComponent->GetStaticMesh()->GetStaticMaterials().Num(); ++MaterialIndex)
+		{
+			UMaterialInterface* Material = InstancedStaticMeshComponent->GetStaticMesh()->GetMaterial(MaterialIndex);
+			InstancedStaticMeshComponent->SetMaterial(MaterialIndex, Material);
+		}
+		const int32 InstanceIndex = InstancedStaticMeshComponent->AddInstance(FTransform(Location));
+		InstanceIndices.Add(InstanceIndex);
 	}
 }
 
