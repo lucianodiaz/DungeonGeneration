@@ -60,6 +60,7 @@ void ARDungeonManager::CreateRooms()
 			{
 				if(DoesCollide(NewRoom,Room))
 				{
+					UE_LOG(LogTemp,Log,TEXT("Collide NewRoom"));
 					bCollision = true;
 					break;
 				}
@@ -87,18 +88,17 @@ void ARDungeonManager::GenerateRoomAdjacent(const FRoomStruct& BaseRoom, FRoomSt
 	NewRoom.SizeY = SizeY;
 	//Position MUST be calculated by position of room BASE bc if We only use BASEX or BASEY
 	//NewRoom maybe spawn far from base room, we don't want that
+	
 	TArray<FVector> NewPositions =
-		{
-			FVector((BaseX + BaseRoom.SizeX * TileSize),BaseY,0.0f),//Right
-		
-			FVector((BaseX - BaseRoom.SizeX + TileSize),BaseY,0.0f),//Left THIS
-		
-			FVector(BaseX,BaseY + (BaseRoom.SizeY * TileSize),0.0f),//Up 
-		
-			FVector(BaseX,BaseY - (BaseRoom.SizeY + TileSize),0.0f)//Down 
-		};
+	{
+		FVector(BaseX, BaseY - (NewRoom.SizeY * TileSize), 0.0f), // LEFT (0)
+		FVector(BaseX + (BaseRoom.SizeX * TileSize), BaseY, 0.0f), // UP (1)
+		FVector(BaseX, BaseY + (BaseRoom.SizeY * TileSize), 0.0f), // RIGHT (2)
+		FVector(BaseX - (NewRoom.SizeX * TileSize), BaseY, 0.0f) // DOWN (3)
+	};
 	const int Index =  FMath::RandRange(0,NewPositions.Num()-1);
 
+	
 	NewRoom.Position = FVector2D(NewPositions[Index].X,NewPositions[Index].Y);
 	NewRoom.Direction = Index;
 }
@@ -122,7 +122,15 @@ void ARDungeonManager::CreateFloor(FRoomStruct& Room)
 	const FString Name = "Room_"+FString::FromInt(Room.ID);
 	FirstNode->SetActorLabel(Name);
 
+
+
+	FActorSpawnParameters SpawnParameters;
+
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	ARTiles* TileContainer = GetWorld()->SpawnActor<ARTiles>(TileClass,FVector::ZeroVector,FRotator::ZeroRotator,SpawnParameters);
 	
+	TileContainer->AttachToActor(FirstNode,FAttachmentTransformRules::KeepRelativeTransform);
 	for(int i=0; i<Room.Size(); i++)
 	{
 		const int Row = i / Room.SizeY;
@@ -131,24 +139,21 @@ void ARDungeonManager::CreateFloor(FRoomStruct& Room)
 		const float X = (Row * TileSize) + Room.Position.X;
 		const float Y = (Col * TileSize) + Room.Position.Y;
 		FVector Location = FVector(X,Y,0.0f);
-		FActorSpawnParameters SpawnParameters;
-
-		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		ARTiles* Tile = GetWorld()->SpawnActor<ARTiles>(TileClass,Location,FRotator::ZeroRotator,SpawnParameters);
 		
-		Tile->AttachToActor(FirstNode,FAttachmentTransformRules::KeepRelativeTransform);
-		Room.Tiles.Add(Tile);
+		
+		TileContainer->AddTileInstance(Location);
+		
 	}
-
+	Room.TileContainer = TileContainer;
 	FirstNode->Room = Room;
 }
 
 void ARDungeonManager::CreateWalls(FRoomStruct& Room)
 {
-
-	for (int i=0; i<Room.Tiles.Num();i++)
+	
+	for (int i=0; i<Room.TileContainer->InstanceIndices.Num();i++)
 	{
-		ARTiles* Tiles = Room.Tiles[i];
+		
 
 		const int Row = i / Room.SizeY;
 		const int Col = i % Room.SizeY;
@@ -157,7 +162,7 @@ void ARDungeonManager::CreateWalls(FRoomStruct& Room)
 		if((Row == 0 || Row == Room.SizeX-1)|| (Col == 0 || Col == SizeY-1))
 		{
 			//Do change Tile
-			Tiles->ChangeTile(WallMesh);
+			Room.TileContainer->ChangeTile(WallMesh,i);
 		}
 		
 		

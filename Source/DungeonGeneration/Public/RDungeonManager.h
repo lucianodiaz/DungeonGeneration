@@ -42,8 +42,8 @@ struct FRoomStruct
 	int SizeY;
 	
 	UPROPERTY(VisibleAnywhere)
-	TArray<ARTiles*> Tiles;
-
+	ARTiles* TileContainer;
+	
 	int Size() const
 	{
 		return SizeX*SizeY;
