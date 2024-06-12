@@ -184,8 +184,8 @@ bool ARDungeonManager::DoesCollide(const FRoomStruct& RoomA, const FRoomStruct& 
 
 void ARDungeonManager::RandomSize()
 {
-	SizeX = FMath::RandRange(7,15);
-	SizeY = FMath::RandRange(7,15);
+	SizeX = FMath::RandRange(8,16);
+	SizeY = FMath::RandRange(8,16);
 }
 
 FRoomStruct& ARDungeonManager::GetRandomRoom()

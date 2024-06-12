@@ -9,6 +9,11 @@
 class ARoom;
 class ARTiles;
 
+
+//For this project we will take this Way
+// X it's going to take for Forward or maybe UP direction we don't use Z for UP or down
+// Y it's going to take for RIGHT direction 
+
 USTRUCT(BlueprintType)
 struct FRoomStruct
 {
