@@ -18,6 +18,11 @@ ARTiles::ARTiles()
 	
 }
 
+UInstancedStaticMeshComponent* ARTiles::GetInstancedStaticMeshComponent() const
+{
+	return InstancedStaticMeshComponent;
+}
+
 // Called when the game starts or when spawned
 void ARTiles::BeginPlay()
 {

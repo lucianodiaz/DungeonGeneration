@@ -21,6 +21,8 @@ public:
 
 	void AddTileInstance(const FVector Location);
 	TArray<int32> InstanceIndices;
+
+	UInstancedStaticMeshComponent* GetInstancedStaticMeshComponent() const;
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

@@ -8,7 +8,7 @@
 
 class ARoom;
 class ARTiles;
-
+class ARDoor;
 
 //For this project we will take this Way
 // X it's going to take for Forward or maybe UP direction we don't use Z for UP or down
@@ -21,6 +21,7 @@ struct FRoomStruct
 
 	FRoomStruct()
 	{
+		TileContainer = nullptr;
 		ID = 0;
 		Position = FVector2D::Zero();
 		SizeX =0;
@@ -28,31 +29,47 @@ struct FRoomStruct
 		CreatedByID =0;
 		Direction=0;
 	}
+	
 	UPROPERTY(VisibleAnywhere)
 	int ID;
 
 	UPROPERTY(VisibleAnywhere)
 	int CreatedByID;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly)
 	int Direction;
 	
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly)
 	FVector2D Position;
 	
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly)
 	int SizeX;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly)
 	int SizeY;
 	
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
 	ARTiles* TileContainer;
+
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
+	TArray<ARDoor*> Doors;
+
+	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
+	ARoom* RoomActor;
 	
 	int Size() const
 	{
 		return SizeX*SizeY;
 	}
+};
+
+struct FMidpoints
+{
+	FVector Top;
+	FVector Bottom;
+	FVector Left;
+	FVector Right;
+	FVector Center;
 };
 
 UCLASS()
@@ -80,10 +97,16 @@ protected:
 
 	void CreateWalls(FRoomStruct& Room);
 
+	void ConnectDoors(FRoomStruct& BaseRoom,FRoomStruct& NewRoom);
+
+	void SpawnDoor(FRoomStruct& BaseRoom,FRoomStruct& NewRoom,FVector& DoorAPosition,FVector& DoorBPosition,FRotator& RotRoomA, FRotator& RotRoomB);
 	bool DoesCollide(const FRoomStruct& RoomA, const FRoomStruct& RoomB) const;
 
 	void RandomSize();
+	
 	FRoomStruct& GetRandomRoom();
+
+	FMidpoints GetMidPoints(const FRoomStruct Room,const int Ts = 100);
 	///VARIABLES
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,meta=(ClampMin=5))
 	int SizeX;
@@ -102,6 +125,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite)
 	TSubclassOf<ARoom> RoomClass;
+
+	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite)
+	TSubclassOf<ARDoor> DoorClass;
 
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly)
 	UStaticMesh* WallMesh;

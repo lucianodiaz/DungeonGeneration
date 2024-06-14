@@ -3,8 +3,11 @@
 
 #include "RDungeonManager.h"
 
+#include "RDoor.h"
 #include "Room.h"
 #include "RTiles.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Kismet/KismetMathLibrary.h"
 
 // Sets default values
 ARDungeonManager::ARDungeonManager()
@@ -72,7 +75,10 @@ void ARDungeonManager::CreateRooms()
 				NewRoom.ID = i;
 				CreateFloor(NewRoom);
 				CreateWalls(NewRoom);
+				ConnectDoors(BaseRoom,NewRoom);
 				AddRoomToList(NewRoom);
+
+				NewRoom.RoomActor->SetActorHiddenInGame(true);
 			}
 		}
 	}
@@ -145,7 +151,9 @@ void ARDungeonManager::CreateFloor(FRoomStruct& Room)
 		
 	}
 	Room.TileContainer = TileContainer;
+	Room.RoomActor = FirstNode;
 	FirstNode->Room = Room;
+	
 }
 
 void ARDungeonManager::CreateWalls(FRoomStruct& Room)
@@ -167,6 +175,71 @@ void ARDungeonManager::CreateWalls(FRoomStruct& Room)
 		
 		
 	}
+}
+
+void ARDungeonManager::ConnectDoors(FRoomStruct& BaseRoom, FRoomStruct& NewRoom)
+{
+	FMidpoints MidNewRoom = GetMidPoints(NewRoom);
+	FMidpoints MidBaseRoom = GetMidPoints(BaseRoom);
+
+
+	FRotator RightDirection = FRotator(0.0f,180.0f,0.0f);
+	FRotator ForwardDirection = FRotator(0.0f,90.0f,0.0f);
+	FRotator LeftDirection = FRotator(0.0f,0.0f,0.0f);
+	FRotator BackDirection = FRotator(0.0f,270.0f,0.0f);
+	switch (NewRoom.Direction)
+	{
+	case 0: //left
+		//Connect Rigth side of new room with Left side Base Room
+			SpawnDoor(BaseRoom, NewRoom, MidNewRoom.Right,
+					  MidBaseRoom.Left,RightDirection,LeftDirection);
+			break;
+
+	case 1: //up
+		//Connect Bottom side of new room with TOP side of Base room
+			SpawnDoor(BaseRoom, NewRoom, MidNewRoom.Bottom,
+					  MidBaseRoom.Top,BackDirection,ForwardDirection);
+			break;
+	case 2: //right
+		//Connect Left side of New Room with Right Side of base Room
+			SpawnDoor(BaseRoom, NewRoom, MidNewRoom.Left,
+					  MidBaseRoom.Right,LeftDirection,RightDirection);
+			break;
+
+	
+	case 3: //down
+			//connect Top side of New room with Bottom side of base room
+
+			SpawnDoor(BaseRoom, NewRoom, MidNewRoom.Top,
+					  MidBaseRoom.Bottom,ForwardDirection,BackDirection);
+			break;
+
+		
+	default:
+		break;
+	}
+	
+				
+}
+
+void ARDungeonManager::SpawnDoor(FRoomStruct& BaseRoom, FRoomStruct& NewRoom, FVector& DoorAPosition,
+	FVector& DoorBPosition,FRotator& RotRoomA, FRotator& RotRoomB)
+{
+	FActorSpawnParameters SpawnParameters;
+
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	
+	auto NewRoomDoor = GetWorld()->SpawnActor<ARDoor>(DoorClass,DoorAPosition,RotRoomA,SpawnParameters);
+	auto BaseRoomDoor = GetWorld()->SpawnActor<ARDoor>(DoorClass,DoorBPosition,RotRoomB,SpawnParameters);
+	
+	NewRoomDoor->ConnectNextDoor(BaseRoomDoor);
+	NewRoomDoor->ConnectNextRoom(BaseRoom);
+
+	BaseRoomDoor->ConnectNextDoor(NewRoomDoor);
+	BaseRoomDoor->ConnectNextRoom(NewRoom);
+
+	NewRoomDoor->AttachToActor(NewRoom.TileContainer,FAttachmentTransformRules::KeepRelativeTransform);
+	BaseRoomDoor->AttachToActor(BaseRoom.TileContainer,FAttachmentTransformRules::KeepRelativeTransform);
 }
 
 bool ARDungeonManager::DoesCollide(const FRoomStruct& RoomA, const FRoomStruct& RoomB) const
@@ -193,6 +266,24 @@ FRoomStruct& ARDungeonManager::GetRandomRoom()
 	const int Index =  FMath::RandRange(0,Rooms.Num()-1);
 
 	return Rooms[Index];
+}
+
+FMidpoints ARDungeonManager::GetMidPoints(const FRoomStruct Room,const int Ts)
+{
+	FMidpoints Midpoints;
+
+
+	Midpoints.Left = FVector(Room.Position.X + (((Room.SizeX-1) * Ts) / 2), Room.Position.Y+(Ts/1.8),0.0f);
+	Midpoints.Bottom = FVector(Room.Position.X + (Ts/1.8), Room.Position.Y + (((Room.SizeY-1.5) * Ts) / 2),0.0f);
+
+	Midpoints.Right = FVector(Room.Position.X + (((Room.SizeX-1) * Ts) / 2), Room.Position.Y + ((Room.SizeY-1.5) * Ts),0.0f);
+
+	Midpoints.Top = FVector(Room.Position.X + ((Room.SizeX-1.5) * Ts), Room.Position.Y + (((Room.SizeY-1) * Ts) / 2),0.0f);
+
+	Midpoints.Center = FVector(Room.Position.X + ((Room.SizeX)* Ts)/2,Room.Position.Y + ((Room.SizeY) * Ts)/2,0.0f);
+	
+	return Midpoints;
+	
 }
 
 // Called every frame
