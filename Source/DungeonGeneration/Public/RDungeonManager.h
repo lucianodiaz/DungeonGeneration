@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "RDungeonManager.generated.h"
 
+struct FRoomStruct;
 class ARoom;
 class ARTiles;
 class ARDoor;
@@ -14,54 +15,7 @@ class ARDoor;
 // X it's going to take for Forward or maybe UP direction we don't use Z for UP or down
 // Y it's going to take for RIGHT direction 
 
-USTRUCT(BlueprintType)
-struct FRoomStruct
-{
-	GENERATED_BODY()
 
-	FRoomStruct()
-	{
-		TileContainer = nullptr;
-		ID = 0;
-		Position = FVector2D::Zero();
-		SizeX =0;
-		SizeY =0;
-		CreatedByID =0;
-		Direction=0;
-	}
-	
-	UPROPERTY(VisibleAnywhere)
-	int ID;
-
-	UPROPERTY(VisibleAnywhere)
-	int CreatedByID;
-
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly)
-	int Direction;
-	
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly)
-	FVector2D Position;
-	
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly)
-	int SizeX;
-
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly)
-	int SizeY;
-	
-	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
-	ARTiles* TileContainer;
-
-	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
-	TArray<ARDoor*> Doors;
-
-	UPROPERTY(VisibleAnywhere,BlueprintReadWrite)
-	ARoom* RoomActor;
-	
-	int Size() const
-	{
-		return SizeX*SizeY;
-	}
-};
 
 struct FMidpoints
 {
@@ -89,7 +43,7 @@ protected:
 
 	void CreateRooms();
 
-	void GenerateRoomAdjacent(const FRoomStruct& BaseRoom, FRoomStruct& NewRoom);
+	void GenerateRoomAdjacent(const FRoomStruct& BaseRoom, FRoomStruct& NewRoom,TSubclassOf<ARoom>& RoomClass);
 	
 	void AddRoomToList(const FRoomStruct& Room);
 
@@ -103,15 +57,21 @@ protected:
 	bool DoesCollide(const FRoomStruct& RoomA, const FRoomStruct& RoomB) const;
 
 	void RandomSize();
+
+	bool ExistTreasureRoom() const;
+
+	bool ExistBoosRoom() const;
+
+	bool ExistTrapRoom() const;
 	
 	FRoomStruct& GetRandomRoom();
 
 	FMidpoints GetMidPoints(const FRoomStruct Room,const int Ts = 100);
 	///VARIABLES
-	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,meta=(ClampMin=5))
+	UPROPERTY(BlueprintReadOnly,meta=(ClampMin=5))
 	int SizeX;
 	
-	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,meta=(ClampMin=5))
+	UPROPERTY(BlueprintReadOnly,meta=(ClampMin=5))
 	int SizeY;
 
 	UPROPERTY(BlueprintReadOnly)
@@ -121,19 +81,28 @@ protected:
 	TArray<FRoomStruct> Rooms;
 
 	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite)
-	TSubclassOf<ARTiles> TileClass;
-
-	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite)
-	TSubclassOf<ARoom> RoomClass;
-
-	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite)
 	TSubclassOf<ARDoor> DoorClass;
+	
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly)
+	TSubclassOf<ARoom> NormalRoomClass;
 
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly)
-	UStaticMesh* WallMesh;
+	TSubclassOf<ARoom> TreasureRoomClass;
 
-	UPROPERTY(EditAnywhere,BlueprintReadWrite)
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly)
+	TSubclassOf<ARoom> BossRoomClass;
+
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly)
+	TSubclassOf<ARoom> TrapRoomClass;
+	
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Creator")
 	int RoomsQuantity = 10;
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Creator")
+	int MaxSize = 18;
+	
+	UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Creator")
+	int MinSize = 8;
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

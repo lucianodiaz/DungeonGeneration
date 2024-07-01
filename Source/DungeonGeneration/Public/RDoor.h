@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "RDungeonManager.h"
+#include "RoomStruct.h"
 #include "GameFramework/Actor.h"
 #include "RDoor.generated.h"
 

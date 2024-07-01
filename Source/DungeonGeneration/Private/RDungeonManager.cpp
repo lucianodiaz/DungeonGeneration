@@ -5,10 +5,8 @@
 
 #include "RDoor.h"
 #include "Room.h"
+#include "RoomStruct.h"
 #include "RTiles.h"
-#include "Components/InstancedStaticMeshComponent.h"
-#include "Kismet/KismetMathLibrary.h"
-
 // Sets default values
 ARDungeonManager::ARDungeonManager()
 {
@@ -33,14 +31,30 @@ void ARDungeonManager::CreateFirstRoom()
 {
 	FRoomStruct NewRoom;
 
-	NewRoom.Position = FVector2D(0,0);
-	NewRoom.SizeX = SizeX;
-	NewRoom.SizeY = SizeY;
-	NewRoom.ID = 0;
+	
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				
+	ARoom* RoomActor = GetWorld()->SpawnActor<ARoom>(NormalRoomClass,FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
 
-	CreateFloor(NewRoom);
-	CreateWalls(NewRoom);
-	AddRoomToList(NewRoom);
+	if(RoomActor)
+	{
+		NewRoom.Position = FVector2D(0,0);
+		NewRoom.SizeX = SizeX;
+		NewRoom.SizeY = SizeY;
+		NewRoom.ID = 0;
+
+		NewRoom.RoomActor = RoomActor;
+		RoomActor->Room = NewRoom;
+		
+		RoomActor->AttachToActor(this,FAttachmentTransformRules::KeepRelativeTransform);
+					
+		const FString Name = "Room_"+FString::FromInt(NewRoom.ID);
+		RoomActor->SetActorLabel(Name);
+		CreateFloor(NewRoom);
+		CreateWalls(NewRoom);
+		AddRoomToList(NewRoom);
+	}
 }
 
 void ARDungeonManager::CreateRooms()
@@ -55,58 +69,90 @@ void ARDungeonManager::CreateRooms()
 			bool bCollision= false;
 			
 			FRoomStruct NewRoom;
-
+			TSubclassOf<ARoom> RoomClass;
 			auto& BaseRoom = GetRandomRoom();
-			GenerateRoomAdjacent(BaseRoom,NewRoom);
-
-			for(auto&& Room : Rooms)
+			
+			if (BaseRoom.RoomType == Normal)
 			{
-				if(DoesCollide(NewRoom,Room))
+				GenerateRoomAdjacent(BaseRoom,NewRoom,RoomClass);
+				for (auto&& Room : Rooms)
 				{
-					UE_LOG(LogTemp,Log,TEXT("Collide NewRoom"));
-					bCollision = true;
-					break;
+					if (DoesCollide(NewRoom, Room))
+					{
+						UE_LOG(LogTemp, Log, TEXT("Collide NewRoom"));
+						bCollision = true;
+						break;
+					}
 				}
-			}
-			if(!bCollision)
-			{
-				bFoundPosition = true;
-				NewRoom.CreatedByID = BaseRoom.ID;
-				NewRoom.ID = i;
-				CreateFloor(NewRoom);
-				CreateWalls(NewRoom);
-				ConnectDoors(BaseRoom,NewRoom);
-				AddRoomToList(NewRoom);
+				if (!bCollision)
+				{
+					bFoundPosition = true;
 
-				NewRoom.RoomActor->SetActorHiddenInGame(true);
+					FActorSpawnParameters SpawnParams;
+					SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+					ARoom* RoomActor = GetWorld()->SpawnActor<ARoom>(RoomClass, FVector::ZeroVector,
+					                                                 FRotator::ZeroRotator, SpawnParams);
+
+					if (RoomActor)
+					{
+						NewRoom.RoomActor = RoomActor;
+						RoomActor->Room = NewRoom;
+
+						NewRoom.CreatedByID = BaseRoom.ID;
+						NewRoom.ID = i;
+						RoomActor->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
+
+						const FString Name = "Room_" + FString::FromInt(NewRoom.ID);
+						RoomActor->SetActorLabel(Name);
+						CreateFloor(NewRoom);
+						CreateWalls(NewRoom);
+						ConnectDoors(BaseRoom, NewRoom);
+						AddRoomToList(NewRoom);
+					}
+
+					NewRoom.RoomActor->SetActorHiddenInGame(true);
+				}
 			}
 		}
 	}
 }
 
-void ARDungeonManager::GenerateRoomAdjacent(const FRoomStruct& BaseRoom, FRoomStruct& NewRoom)
+void ARDungeonManager::GenerateRoomAdjacent(const FRoomStruct& BaseRoom, FRoomStruct& NewRoom,TSubclassOf<ARoom>& RoomClass)
 {
 	const float BaseX = BaseRoom.Position.X;
 	const float BaseY = BaseRoom.Position.Y;
-
-	RandomSize();
-	NewRoom.SizeX = SizeX;
-	NewRoom.SizeY = SizeY;
+	
 	//Position MUST be calculated by position of room BASE bc if We only use BASEX or BASEY
 	//NewRoom maybe spawn far from base room, we don't want that
-	
-	TArray<FVector> NewPositions =
-	{
-		FVector(BaseX, BaseY - (NewRoom.SizeY * TileSize), 0.0f), // LEFT (0)
-		FVector(BaseX + (BaseRoom.SizeX * TileSize), BaseY, 0.0f), // UP (1)
-		FVector(BaseX, BaseY + (BaseRoom.SizeY * TileSize), 0.0f), // RIGHT (2)
-		FVector(BaseX - (NewRoom.SizeX * TileSize), BaseY, 0.0f) // DOWN (3)
-	};
-	const int Index =  FMath::RandRange(0,NewPositions.Num()-1);
 
-	
-	NewRoom.Position = FVector2D(NewPositions[Index].X,NewPositions[Index].Y);
-	NewRoom.Direction = Index;
+	RoomClass = NormalRoomClass;
+
+	if(RoomClass)
+	{
+		const ARoom* DefaultRoom = Cast<ARoom>(RoomClass->GetDefaultObject());
+		if(DefaultRoom)
+		{
+			NewRoom.RoomType = DefaultRoom->Room.RoomType;
+			RandomSize();
+			NewRoom.SizeX = NewRoom.RoomType == Normal ? SizeX : DefaultRoom->Room.SizeX;
+			NewRoom.SizeY =  NewRoom.RoomType == Normal ? SizeY : DefaultRoom->Room.SizeY;
+			
+			TArray<FVector> NewPositions =
+			{
+				FVector(BaseX, BaseY - (NewRoom.SizeY * TileSize), 0.0f), // LEFT (0)
+				FVector(BaseX + (BaseRoom.SizeX * TileSize), BaseY, 0.0f), // UP (1)
+				FVector(BaseX, BaseY + (BaseRoom.SizeY * TileSize), 0.0f), // RIGHT (2)
+				FVector(BaseX - (NewRoom.SizeX * TileSize), BaseY, 0.0f) // DOWN (3)
+			};
+			const int Index =  FMath::RandRange(0,NewPositions.Num()-1);
+
+			UE_LOG(LogTemp, Log, TEXT("Direction: %d"),Index);
+			NewRoom.Position = FVector2D(NewPositions[Index].X,NewPositions[Index].Y);
+			NewRoom.Direction = Index;
+		}
+	}
+
 }
 
 void ARDungeonManager::AddRoomToList(const FRoomStruct& Room)
@@ -117,64 +163,70 @@ void ARDungeonManager::AddRoomToList(const FRoomStruct& Room)
 void ARDungeonManager::CreateFloor(FRoomStruct& Room)
 {
 
-	ensureMsgf(TileClass,TEXT("You Need setup the Tile for spawning"));
-	FActorSpawnParameters SpawnParameter;
-
-	SpawnParameter.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	ARoom* FirstNode = GetWorld()->SpawnActor<ARoom>(RoomClass,FVector::ZeroVector,FRotator::ZeroRotator,SpawnParameter);
+	Room.RoomActor->CreateFloor();
 	
-	FirstNode->AttachToActor(this,FAttachmentTransformRules::KeepRelativeTransform);
+	/*
+	// ensureMsgf(TileClass,TEXT("You Need setup the Tile for spawning"));
+	// FActorSpawnParameters SpawnParameter;
+	//
+	// SpawnParameter.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	// ARoom* FirstNode = GetWorld()->SpawnActor<ARoom>(RoomClass,FVector::ZeroVector,FRotator::ZeroRotator,SpawnParameter);
+	//
+	// FirstNode->AttachToActor(this,FAttachmentTransformRules::KeepRelativeTransform);
+	//
+	// const FString Name = "Room_"+FString::FromInt(Room.ID);
+	// FirstNode->SetActorLabel(Name);
+	//
+	//
+	//
+	// FActorSpawnParameters SpawnParameters;
+	//
+	// SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	//
+	// ARTiles* TileContainer = GetWorld()->SpawnActor<ARTiles>(TileClass,FVector::ZeroVector,FRotator::ZeroRotator,SpawnParameters);
+	//
+	// TileContainer->AttachToActor(FirstNode,FAttachmentTransformRules::KeepRelativeTransform);
+	// for(int i=0; i<Room.Size(); i++)
+	// {
+	// 	const int Row = i / Room.SizeY;
+	// 	const int Col = i %  Room.SizeY;
+	//
+	// 	const float X = (Row * TileSize) + Room.Position.X;
+	// 	const float Y = (Col * TileSize) + Room.Position.Y;
+	// 	FVector Location = FVector(X,Y,0.0f);
+	// 	
+	// 	
+	// 	TileContainer->AddTileInstance(Location);
+	// 	
+	// }
+	// Room.TileContainer = TileContainer;
+	// Room.RoomActor = FirstNode;
+	// FirstNode->Room = Room;
+	 */
 
-	const FString Name = "Room_"+FString::FromInt(Room.ID);
-	FirstNode->SetActorLabel(Name);
-
-
-
-	FActorSpawnParameters SpawnParameters;
-
-	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	ARTiles* TileContainer = GetWorld()->SpawnActor<ARTiles>(TileClass,FVector::ZeroVector,FRotator::ZeroRotator,SpawnParameters);
-	
-	TileContainer->AttachToActor(FirstNode,FAttachmentTransformRules::KeepRelativeTransform);
-	for(int i=0; i<Room.Size(); i++)
-	{
-		const int Row = i / Room.SizeY;
-		const int Col = i %  Room.SizeY;
-
-		const float X = (Row * TileSize) + Room.Position.X;
-		const float Y = (Col * TileSize) + Room.Position.Y;
-		FVector Location = FVector(X,Y,0.0f);
-		
-		
-		TileContainer->AddTileInstance(Location);
-		
-	}
-	Room.TileContainer = TileContainer;
-	Room.RoomActor = FirstNode;
-	FirstNode->Room = Room;
 	
 }
 
 void ARDungeonManager::CreateWalls(FRoomStruct& Room)
 {
-	
-	for (int i=0; i<Room.TileContainer->InstanceIndices.Num();i++)
-	{
-		
 
-		const int Row = i / Room.SizeY;
-		const int Col = i % Room.SizeY;
-
-		
-		if((Row == 0 || Row == Room.SizeX-1)|| (Col == 0 || Col == SizeY-1))
-		{
-			//Do change Tile
-			Room.TileContainer->ChangeTile(WallMesh,i);
-		}
-		
-		
-	}
+	Room.RoomActor->CreateWalls();
+	// for (int i=0; i<Room.TileContainer->InstanceIndices.Num();i++)
+	// {
+	// 	
+	//
+	// 	const int Row = i / Room.SizeY;
+	// 	const int Col = i % Room.SizeY;
+	//
+	// 	
+	// 	if((Row == 0 || Row == Room.SizeX-1)|| (Col == 0 || Col == SizeY-1))
+	// 	{
+	// 		//Do change Tile
+	// 		Room.TileContainer->ChangeTile(WallMesh,i);
+	// 	}
+	// 	
+	// 	
+	// }
 }
 
 void ARDungeonManager::ConnectDoors(FRoomStruct& BaseRoom, FRoomStruct& NewRoom)
@@ -238,8 +290,8 @@ void ARDungeonManager::SpawnDoor(FRoomStruct& BaseRoom, FRoomStruct& NewRoom, FV
 	BaseRoomDoor->ConnectNextDoor(NewRoomDoor);
 	BaseRoomDoor->ConnectNextRoom(NewRoom);
 
-	NewRoomDoor->AttachToActor(NewRoom.TileContainer,FAttachmentTransformRules::KeepRelativeTransform);
-	BaseRoomDoor->AttachToActor(BaseRoom.TileContainer,FAttachmentTransformRules::KeepRelativeTransform);
+	NewRoomDoor->AttachToActor(NewRoom.RoomActor,FAttachmentTransformRules::KeepRelativeTransform);
+	BaseRoomDoor->AttachToActor(BaseRoom.RoomActor,FAttachmentTransformRules::KeepRelativeTransform);
 }
 
 bool ARDungeonManager::DoesCollide(const FRoomStruct& RoomA, const FRoomStruct& RoomB) const
@@ -257,9 +309,49 @@ bool ARDungeonManager::DoesCollide(const FRoomStruct& RoomA, const FRoomStruct& 
 
 void ARDungeonManager::RandomSize()
 {
-	SizeX = FMath::RandRange(8,16);
-	SizeY = FMath::RandRange(8,16);
+	SizeX = FMath::RandRange(8,18);
+	SizeY = FMath::RandRange(8,18);
 }
+
+bool ARDungeonManager::ExistTreasureRoom() const
+{
+	for(auto r:Rooms)
+	{
+		if(r.RoomType == Treasure)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool ARDungeonManager::ExistBoosRoom() const
+{
+	for(auto r:Rooms)
+	{
+		if(r.RoomType == Boss)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool ARDungeonManager::ExistTrapRoom() const
+{
+	for(auto r:Rooms)
+	{
+		if(r.RoomType == Trap)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 
 FRoomStruct& ARDungeonManager::GetRandomRoom()
 {
